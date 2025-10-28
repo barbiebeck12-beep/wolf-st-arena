@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WOLF STREET: CPU ARENA (Progress Bar Model)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css?family=Press+Start+2P&family=Rubik+Mono+One&display=swap');
+
+        :root {
+            --neon-pink: #ff00ff;
+            --neon-cyan: #00ffff;
+            --neon-yellow: #ffff00;
+            --neon-green: #00ff00;
+            --neon-red: #ff0000;
+            --dark-blue: #0f0f23;
+            --deep-purple: #330033;
+        }
+
+        body {
+            font-family: 'Press Start 2P', cursive;
+            background-color: var(--dark-blue);
+            margin: 0;
+            padding: 20px;
+            color: #fff;
+            overflow-x: hidden;
+            background-image:
+                radial-gradient(circle at 10% 20%, rgba(255,0,255,0.1) 0%, transparent 20%),
+                radial-gradient(circle at 90% 80%, rgba(0,255,255,0.1) 0%, transparent 20%);
+        }
+
+        #game-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: rgba(0,0,30,0.9);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 0 40px var(--neon-cyan);
+            border: 2px solid var(--neon-cyan);
+        }
+
+        .text-shadow-neon {
+            text-shadow: 0 0 5px var(--neon-cyan), 0 0 10px var(--neon-cyan);
+        }
+
+        .bot-card {
+            background-color: rgba(0, 0, 0, 0.4);
+            border-radius: 8px;
+            border: 1px solid var(--neon-pink);
+            box-shadow: 0 0 8px var(--neon-pink);
+            position: relative;
+        }
+        
+        .avatar {
+            font-size: 2.5rem;
+            line-height: 1;
+        }
+
+        .log-item {
+            font-size: 10px;
+            padding: 2px 0;
+            border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
+        }
+        
+        #player-cards-container {
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        }
+
+        /* Styling for the Visualizer */
+        #visualizer-image {
+            transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+            animation: pulse-border 1.5s infinite alternate;
+        }
+
+        @keyframes pulse-border {
+            from { box-shadow: 0 0 10px var(--neon-cyan), 0 0 0 0 rgba(0, 255, 255, 0.5); }
+            to { box-shadow: 0 0 20px var(--neon-cyan), 0 0 10px 5px rgba(0, 255, 255, 0.8); }
+        }
+
+        /* Map Styling */
+        #map-container {
+            border: 2px solid var(--neon-cyan);
+            background-color: rgba(0, 10, 10, 0.8);
+            /* Grid background to represent city blocks/streets */
+            background-image: repeating-linear-gradient(0deg, rgba(0, 255, 255, 0.1) 0, transparent 1px),
+                              repeating-linear-gradient(90deg, rgba(0, 255, 255, 0.1) 0, transparent 1px);
+            background-size: 20px 20px;
+            box-shadow: 0 0 10px var(--neon-cyan);
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <h1 class="text-3xl text-center mb-6 text-[var(--neon-yellow)] font-mono text-shadow-neon">
+            WOLF STREET: CPU ARENA
+        </h1>
+
+        <div id="game-status" class="p-4 mb-6 rounded-lg font-mono text-center text-sm"
+            style="background-color: rgba(0, 50, 50, 0.6); border: 2px solid var(--neon-cyan);">
+            <span id="current-turn-display">Awaiting simulation start...</span>
+        </div>
+
+        <!-- Visualizer and Controls Side-by-Side on Desktop -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            
+            <!-- LIVE ACTION VISUALIZER & MAP CONTAINER -->
+            <div id="action-visualizer" class="p-4 rounded-xl shadow-xl border-2 mb-6 lg:mb-0 flex flex-col items-center" 
+                style="background-color: rgba(0,0,30,0.8); border-color: var(--neon-pink);">
+                
+                <h2 class="text-xl font-bold text-[var(--neon-pink)] mb-3 pb-2 border-b border-[var(--neon-pink)] w-full text-center">
+                    <span class="text-shadow-neon">Live Action Visualizer</span>
+                </h2>
+                
+                <div id="visualizer-content" class="flex flex-col items-center justify-center mb-4">
+                    <img id="visualizer-image" src="" alt="Active Player" 
+                         class="hidden w-32 h-32 object-cover rounded-full border-4 border-[var(--neon-cyan)] shadow-lg" 
+                         style="box-shadow: 0 0 10px var(--neon-cyan);">
+                    <div id="visualizer-text" class="text-lg mt-4 text-center text-[var(--neon-yellow)] font-mono">
+                        Simulation Paused.
+                    </div>
+                </div>
+
+                <!-- NEW: WOLF STREET MAP -->
+                <div class="w-full h-48 relative rounded-lg p-2" id="map-container">
+                    <h3 class="text-xs text-[var(--neon-pink)] font-mono mb-1 text-center absolute top-0 left-1/2 transform -translate-x-1/2 z-20">WOLF STREET Map</h3>
+                    <!-- Location Markers and Player Tokens will be rendered here by JS -->
+                </div>
+            </div>
+
+            <!-- Bot Arena Controls (Original content) -->
+            <div id="bot-arena-controls" class="p-4 rounded-xl shadow-xl border-2" 
+                style="background-color: rgba(0,0,30,0.8); border-color: var(--neon-cyan);">
+                
+                <h2 class="text-xl font-bold text-[var(--neon-cyan)] mb-3 pb-2 border-b border-[var(--neon-cyan)]">
+                    <span class="text-shadow-neon">CPU Player Generator & Controls</span>
+                </h2>
+
+                <div class="flex space-x-3 mb-4">
+                    <button id="toggleBotBtn" class="flex-1 py-2 px-3 rounded-lg font-bold transition duration-300" 
+                            style="background-color: var(--neon-green); color: black; box-shadow: 0 0 5px var(--neon-green);">
+                        <span class="mr-1">▶️</span> Start Simulation
+                    </button>
+                    <button id="resetBtn" class="py-2 px-3 rounded-lg font-bold transition duration-300 w-1/4"
+                            style="background-color: var(--neon-red); color: white; box-shadow: 0 0 5px var(--neon-red);">
+                        Reset
+                    </button>
+                </div>
+                
+                <button id="generateBotBtn" class="w-full py-2 mb-4 rounded-lg font-bold transition duration-300"
+                        style="background-color: var(--deep-purple); color: var(--neon-pink); border: 2px solid var(--neon-pink); box-shadow: 0 0 8px var(--neon-pink);">
+                    <span class="mr-1">➕</span> Generate New CPU Player
+                </button>
+
+                <div class="mb-2">
+                    <label for="botSpeed" class="block text-xs font-medium text-white mb-1">
+                        Decision Speed (ms per tick): <span id="speedValue" class="text-[var(--neon-yellow)] font-mono">1000</span>
+                    </label>
+                    <input type="range" id="botSpeed" min="500" max="5000" value="1000" step="500" 
+                            class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                            style="accent-color: var(--neon-cyan);">
+                </div>
+            </div>
+        </div>
+        <!-- End Visualizer and Controls -->
+
+        <h2 class="text-xl font-bold text-[var(--neon-yellow)] mt-8 mb-3 text-shadow-neon">
+            Active Players
+        </h2>
+        <div id="player-cards-container" class="grid gap-4">
+            </div>
+
+        <div class="mt-8 p-4 rounded-xl border-2 border-[var(--neon-pink)]" style="background-color: rgba(0,0,0,0.6);">
+            <h3 class="text-base font-bold text-[var(--neon-pink)] mb-2">Simulation Log</h3>
+            <div id="game-log" class="h-40 overflow-y-auto font-mono text-gray-300">
+                </div>
+        </div>
+    </div>
+
+    <script>
+        // --- IMAGE MAPPING ---
+        // These IDs map to the uploaded files and will be used to display the player avatar.
+        const IMAGE_MAP = {
+            'jordi': 'uploaded:jordi.jpg-5ba732dd-a17b-44ff-b00b-de1220e7c21f',
+            'mark': 'uploaded:toon mark.jpg-3d87fdf5-bd45-45b5-b740-19dc046f4063',
+            'donnie': 'uploaded:toon donnie.jpg-2132310e-0c06-4b26-87e9-a761e6549506',
+            'brad_kim': 'uploaded:brad kim toon.jfif-d2607ba2-b9be-48a8-9034-8fc2df1a5286' // Unused for now
+        };
+
+        // --- NEW MAP COORDINATES (Relative positions for the map visualizer) ---
+        const MAP_COORDINATES = {
+            'home': { x: 10, y: 70, label: '🏠 HOME' },
+            'office': { x: 50, y: 15, label: '🏢 OFFICE' },
+            'market': { x: 85, y: 40, label: '📈 MARKET' },
+            'gym': { x: 30, y: 40, label: '💪 GYM' },
+            'club': { x: 65, y: 80, label: '🥂 CLUB' },
+            'phone': { x: 85, y: 15, label: '📞 PHONE' }
+        };
+
+        // --- CONFIG ---
+        const ACTION_DURATION_TICKS = 3; // How many ticks a work/invest/sleep action takes
+        const TRAVEL_DURATION_TICKS = 2; // How many ticks a travel action takes
+        
+        // --- GAME CORE: MOCK WOLF STREET STATE & FUNCTIONS ---
+        
+        const LOCATIONS = ['home', 'office', 'market', 'gym', 'club', 'phone']; 
+        
+        const BASE_PLAYER_STATE = {
+            cash: 500,
+            energy: 70,
+            location: 'home',
+            isDriving: false,
+            isBusy: false,
+            busyFinishTick: 0,
+            currentActionDuration: 0, 
+            currentAction: 'IDLE', // NEW: The verb/state (IDLE, DRIVING, WORKING, SLEEPING, etc.)
+            currentActionMessage: 'Awaiting instruction...', // NEW: Detailed message for visualizer
+            strategy: '',
+            id: 0
+        };
+
+        let players = [];
+        let isSimulating = false;
+        let botIntervalId = null;
+        let currentBotSpeed = 1000;
+        let turnIndex = 0;
+        let nextPlayerId = 1;
+        let currentTick = 0; // Global tick counter
+
+        // DOM Elements
+        const currentTurnDisplay = document.getElementById('current-turn-display');
+        const gameLogElement = document.getElementById('game-log');
+        const toggleBotBtn = document.getElementById('toggleBotBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const generateBotBtn = document.getElementById('generateBotBtn');
+        const botSpeedRange = document.getElementById('botSpeed');
+        const speedValueDisplay = document.getElementById('speedValue');
+        const playerCardsContainer = document.getElementById('player-cards-container');
+        const visualizerImage = document.getElementById('visualizer-image');
+        const visualizerText = document.getElementById('visualizer-text');
+        const mapContainer = document.getElementById('map-container'); // NEW: Map Container
+
+        // --- Core Game Actions (The functions the bots will call) ---
+        
+        /**
+         * Sets the player to the busy state for a number of ticks.
+         * @param {object} player - The player object.
+         * @param {string} actionVerb - The key for the action (e.g., 'WORKING', 'SLEEPING').
+         * @param {string} message - The message for the log.
+         */
+        function startBusyAction(player, actionVerb, message) { 
+            player.isBusy = true;
+            player.busyFinishTick = currentTick + ACTION_DURATION_TICKS;
+            player.currentActionDuration = ACTION_DURATION_TICKS; // Set duration
+            player.currentAction = actionVerb;
+            player.currentActionMessage = message;
+            logAction(player.name, `${message} (Busy for ${ACTION_DURATION_TICKS} ticks)`);
+            updateVisualizer();
+        }
+
+        function travel(player, destination) {
+            if (player.location === destination) {
+                logAction(player.name, "is already here.");
+                return false;
+            }
+            if (player.energy < 10) {
+                 logAction(player.name, "failed to travel: Energy too low.");
+                 return false;
+            }
+
+            const travelDurationTicks = TRAVEL_DURATION_TICKS; 
+            player.energy -= 10;
+            
+            // Set busy state for travel duration
+            player.isBusy = true;
+            player.isDriving = true; // Use this flag for rendering/message
+            player.busyFinishTick = currentTick + travelDurationTicks;
+            player.currentActionDuration = travelDurationTicks;
+            player.currentAction = 'DRIVING';
+            player.currentActionMessage = `Traveling to ${destination.toUpperCase()}`;
+
+            logAction(player.name, `is traveling to ${destination}...`);
+
+            // The main loop handles the tick advance and arrival completion check.
+            updateVisualizer(); 
+            return true;
+        }
+
+        function coldCall(player) {
+            if (player.location !== 'phone') {
+                logAction(player.name, "cannot cold call: Not at phone.");
+                return travel(player, 'phone');
+            }
+            if (player.energy < 15) {
+                logAction(player.name, "failed to cold call: Energy too low.");
+                return false;
+            }
+            
+            startBusyAction(player, 'COLD_CALLING', "COLD CALLING...");
+
+            player.cash += 100;
+            player.energy -= 15;
+            logAction(player.name, `COLD CALLED, gained $100. Cash: $${player.cash.toFixed(2)}`);
+            return true;
+        }
+
+        function work(player) {
+            if (player.location !== 'office') {
+                return travel(player, 'office');
+            }
+            if (player.energy < 20) return false;
+            
+            startBusyAction(player, 'WORKING', "WORKING HARD...");
+            player.cash += 150;
+            player.energy -= 20;
+            return true;
+        }
+        
+        function sleep(player) {
+            if (player.location !== 'home') {
+                return travel(player, 'home');
+            }
+            
+            startBusyAction(player, 'SLEEPING', "CATCHING ZzZs...");
+            player.energy = Math.min(100, player.energy + 40);
+            return true;
+        }
+
+        function invest(player) {
+            if (player.location !== 'market') {
+                return travel(player, 'market');
+            }
+            if (player.cash < 500) return false;
+
+            startBusyAction(player, 'INVESTING', "CHECKING CHARTS...");
+            const investmentAmount = 500;
+            player.cash -= investmentAmount;
+            const profit = Math.floor(Math.random() * 800) - 200; 
+            player.cash += profit; 
+            player.energy -= 5;
+            logAction(player.name, `INVESTED $${investmentAmount}. Profit/Loss: $${profit.toFixed(2)}.`);
+            return true;
+        }
+        
+        function party(player) {
+            if (player.location !== 'club') {
+                return travel(player, 'club');
+            }
+            if (player.cash < 200) return false;
+
+            startBusyAction(player, 'PARTYING', "NETWORKING...");
+            player.cash -= 200;
+            player.energy -= 30;
+            return true;
+        }
+
+        // --- BOT STRATEGIES (The Personality Generator) ---
+
+        // Strategy definitions now include the image key
+        const STRATEGIES = {
+            'SURVIVOR': { name: 'The Survivor', logic: survivorBotDecision, imageKey: 'jordi' },
+            'GRIND_WOLF': { name: 'The Grind Wolf (Cold Caller)', logic: grindWolfDecision, imageKey: 'donnie' },
+            'SOCIALITE': { name: 'The Socialite', logic: socialiteDecision, imageKey: 'mark' },
+        };
+        const STRATEGY_KEYS = Object.keys(STRATEGIES);
+        
+        function survivorBotDecision(player) {
+            if (player.isBusy) return true; // Stay busy
+
+            // 1. CRITICAL: Energy Management
+            if (player.energy < 40) {
+                if (player.location !== 'home') return travel(player, 'home');
+                if (player.energy < 70) return sleep(player);
+            } 
+            
+            // 2. MAINTENANCE: Need enough cash to survive (1000 buffer)
+            if (player.cash < 1000) {
+                if (player.location !== 'office') return travel(player, 'office');
+                if (player.energy > 20) return work(player);
+            }
+
+            if (player.location === 'home') return sleep(player);
+            return false;
+        }
+
+        function grindWolfDecision(player) {
+            if (player.isBusy) return true; // Stay busy
+
+            // 1. CRITICAL: Must sleep if almost dead
+            if (player.energy < 20) {
+                if (player.location !== 'home') return travel(player, 'home');
+                return sleep(player);
+            }
+
+            // 2. HIGH PRIORITY: Cold Call for quick cash injection
+            if (player.cash < 5000) {
+                if (player.location !== 'phone') return travel(player, 'phone');
+                if (player.energy > 15) return coldCall(player);
+            }
+
+            // 3. INVESTMENT: If rich enough, go to market
+            if (player.cash >= 5000) {
+                if (player.location !== 'market') return travel(player, 'market');
+                return invest(player);
+            }
+
+            if (player.location !== 'home') return travel(player, 'home');
+            return false; 
+        }
+
+        function socialiteDecision(player) {
+            if (player.isBusy) return true; // Stay busy
+            
+            if (player.energy < 30) {
+                if (player.location !== 'home') return travel(player, 'home');
+                return sleep(player);
+            }
+            
+            if (player.cash < 500) { 
+                if (player.location !== 'office') return travel(player, 'office');
+                return work(player);
+            }
+            
+            if (player.location !== 'club') return travel(player, 'club');
+            if (player.cash >= 200) return party(player);
+            
+            return false;
+        }
+
+
+        // --- SIMULATION LOOP ---
+        
+        function simulateTurn() {
+            if (!isSimulating || players.length === 0) return;
+            
+            // 1. ADVANCE TICK
+            currentTick++;
+            
+            const player = players[turnIndex];
+            currentTurnDisplay.textContent = `TICK: ${currentTick} | Current Player: ${player.name}`;
+
+            // 2. CHECK FOR COMPLETION OF BUSY/DRIVING ACTION
+            if (player.isBusy) { 
+                if (currentTick >= player.busyFinishTick) {
+                    // Action is complete
+                    player.isBusy = false; 
+                    
+                    // Handle travel arrival specifically
+                    if (player.isDriving) {
+                        // Extract destination from message (e.g., "Traveling to OFFICE" -> "office")
+                        const destinationMatch = player.currentActionMessage.match(/to\s+([A-Z]+)/);
+                        if (destinationMatch && destinationMatch[1]) {
+                            player.location = destinationMatch[1].toLowerCase();
+                        }
+                        player.isDriving = false;
+                        logAction(player.name, `arrived at ${player.location}.`);
+                    }
+                    
+                    // Finalize IDLE state
+                    player.currentActionDuration = 0; 
+                    player.currentAction = 'IDLE'; 
+                    player.currentActionMessage = 'Action finished. Ready for next move.';
+                    
+                } else {
+                    // Still busy/driving, skip decision
+                    logAction(player.name, `is ${player.isDriving ? 'DRIVING' : player.currentAction.replace('_', ' ')} (${player.busyFinishTick - currentTick} ticks left). Skipping turn.`);
+                    turnIndex = (turnIndex + 1) % players.length;
+                    renderPlayers();
+                    updateVisualizer(); 
+                    return; 
+                }
+            } 
+            
+            // 3. EXECUTE DECISION
+            const decisionFunction = STRATEGIES[player.strategy].logic;
+            const madeDecision = decisionFunction(player);
+            
+            // If the player did not successfully start an action, they become IDLE for one tick
+            if (!madeDecision) {
+                player.currentAction = 'IDLE';
+                player.currentActionMessage = 'Decided to wait/cannot act.';
+            }
+
+            // 4. ADVANCE TURN
+            turnIndex = (turnIndex + 1) % players.length;
+            renderPlayers();
+            updateVisualizer(); 
+        }
+
+        // --- MAP RENDERER (NEW) ---
+        function renderMap() {
+            if (!mapContainer) return;
+            
+            let mapHtml = '';
+            
+            // 1. Render Location Markers (Static Background)
+            for (const loc in MAP_COORDINATES) {
+                const coords = MAP_COORDINATES[loc];
+                mapHtml += `
+                    <div class="absolute flex flex-col items-center justify-center text-xs font-mono text-white" 
+                         style="left: ${coords.x}%; top: ${coords.y}%; transform: translate(-50%, -50%);">
+                        <span class="p-1 rounded-full text-center" style="background-color: var(--neon-pink); box-shadow: 0 0 8px var(--neon-pink);">
+                            ${coords.label.split(' ')[0]}
+                        </span>
+                        <span class="mt-1 text-[var(--neon-cyan)] text-shadow-neon">${coords.label.split(' ')[1]}</span>
+                    </div>
+                `;
+            }
+
+            // 2. Render Player Tokens (Dynamic Overlays)
+            players.forEach(player => {
+                const coords = MAP_COORDINATES[player.location];
+                const strategy = STRATEGIES[player.strategy];
+                const imageUrl = IMAGE_MAP[strategy.imageKey];
+                
+                // Offset multiple players at the same spot slightly for visibility
+                const offset = players.filter(p => p.location === player.location).findIndex(p => p.id === player.id) * 3;
+                
+                const isActive = player.id === players[turnIndex].id && isSimulating;
+                const pulseClass = isActive ? 'animate-pulse' : '';
+                const borderColor = isActive ? 'border-[var(--neon-yellow)]' : 'border-gray-500';
+
+                mapHtml += `
+                    <div class="absolute transition-all duration-700 ease-in-out z-10" 
+                         title="${player.name} at ${player.location.toUpperCase()}"
+                         style="left: ${coords.x + offset}%; top: ${coords.y + offset}%; transform: translate(-50%, -50%);">
+                        <img src="${imageUrl}" alt="${player.name}" class="w-6 h-6 object-cover rounded-full border-2 ${borderColor} shadow-lg ${pulseClass}">
+                    </div>
+                `;
+            });
+            
+            mapContainer.innerHTML = mapHtml;
+        }
+
+
+        // --- VISUALIZER FUNCTION (UPDATED) ---
+        function updateVisualizer() {
+            renderMap(); // Render the player tokens on the map
+
+            if (!isSimulating || players.length === 0) {
+                visualizerImage.classList.add('hidden');
+                visualizerText.innerHTML = "Simulation Paused.<br>Start to see the action!";
+                return;
+            }
+
+            const player = players[turnIndex];
+            const strategy = STRATEGIES[player.strategy];
+            const imageUrl = IMAGE_MAP[strategy.imageKey];
+
+            // Set Image for the main visualizer
+            visualizerImage.src = imageUrl;
+            visualizerImage.classList.remove('hidden');
+
+            // Determine the current state for display
+            let actionDetail;
+            let detailColor = 'text-[var(--neon-cyan)]';
+            if (player.isBusy) {
+                // Use the currentActionMessage which is more descriptive
+                actionDetail = player.currentActionMessage.toUpperCase();
+                detailColor = player.isDriving ? 'text-[var(--neon-yellow)]' : 'text-[var(--neon-red)]';
+            } else {
+                actionDetail = 'READY TO ACT';
+            }
+
+            // Update Text to show the active action
+            visualizerText.innerHTML = `<span class="text-[var(--neon-pink)] text-lg">${player.name} (${strategy.name})</span><br>
+                                        <span class="${detailColor} text-xl mt-1 font-bold">${actionDetail}</span>`;
+        }
+
+
+        // --- UTILITY FUNCTIONS ---
+
+        function getRandomElement(arr) {
+            return arr[Math.floor(Math.random() * arr.length)];
+        }
+
+        function generateNewBot(initial = false) {
+            const strategyKey = getRandomElement(STRATEGY_KEYS);
+            const strategy = STRATEGIES[strategyKey];
+            
+            const newBot = { 
+                ...BASE_PLAYER_STATE, 
+                name: strategy.name + ' ' + nextPlayerId,
+                strategy: strategyKey, 
+                id: nextPlayerId,
+                cash: initial ? BASE_PLAYER_STATE.cash : Math.floor(Math.random() * 1000) + 100, 
+                energy: initial ? BASE_PLAYER_STATE.energy : Math.floor(Math.random() * 50) + 50,
+            };
+            
+            players.push(newBot);
+            nextPlayerId++;
+
+            logAction("GENERATOR", `Added new bot: ${newBot.name} (${strategy.name}).`);
+            renderPlayers();
+
+            if (isSimulating) {
+                // Restart interval to evenly distribute turns among new player count
+                clearInterval(botIntervalId);
+                botIntervalId = setInterval(simulateTurn, currentBotSpeed);
+            }
+        }
+
+
+        function logAction(player, message) {
+            const time = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-item';
+            logEntry.innerHTML = `<span style="color:var(--neon-cyan);">${time}</span> | 
+                                 <strong style="color:var(--neon-yellow);">${player}</strong> 
+                                 <span style="color:var(--neon-pink);"> > </span> ${message}`;
+            gameLogElement.prepend(logEntry);
+            while (gameLogElement.children.length > 100) {
+                gameLogElement.removeChild(gameLogElement.lastChild);
+            }
+        }
+
+        function createInitialPlayers() {
+            players = [];
+            nextPlayerId = 1;
+            for (let i = 0; i < 3; i++) {
+                generateNewBot(true); 
+            }
+            turnIndex = 0;
+            currentTick = 0;
+            
+            // Reset state variables for initial 3 bots
+            players[0].cash = 600;
+            players[1].cash = 300;
+            players[2].energy = 90;
+        }
+        
+        function renderPlayers() {
+            playerCardsContainer.innerHTML = players.map(player => {
+                const strategy = STRATEGIES[player.strategy];
+                let statusText;
+                let progressHtml = '';
+                let statusColor;
+
+                if (player.isBusy) {
+                    const ticksRemaining = player.busyFinishTick - currentTick;
+                    const totalTicks = player.currentActionDuration;
+
+                    // Calculate elapsed ticks
+                    const ticksElapsed = totalTicks - ticksRemaining;
+                    // Ensure the percentage is between 0 and 100 (handles edge cases)
+                    const progressPercent = Math.min(100, Math.max(0, (ticksElapsed / totalTicks) * 100));
+                    
+                    const actionLabel = player.isDriving ? 'DRIVING' : player.currentAction.replace('_', ' ');
+                    statusText = actionLabel.toUpperCase();
+                    statusColor = player.isDriving ? 'text-[var(--neon-yellow)]' : 'text-red-500';
+
+                    // Progress Bar HTML
+                    progressHtml = `
+                        <div class="w-full h-2 bg-gray-800 rounded-full mt-1 overflow-hidden">
+                            <div class="h-full rounded-full transition-all duration-300" 
+                                style="width: ${progressPercent}%; background-color: var(--neon-cyan); box-shadow: 0 0 5px var(--neon-cyan);">
+                            </div>
+                        </div>
+                        <p class="text-[8px] text-gray-400 mt-[1px]">${ticksRemaining} Ticks Left</p>
+                    `;
+                } else {
+                    statusText = 'READY';
+                    statusColor = 'text-green-500';
+                }
+                
+                // Get image URL for card avatar
+                const imageUrl = IMAGE_MAP[strategy.imageKey];
+
+                return `
+                    <div class="bot-card p-4 flex items-center transition duration-300 ${player.isBusy ? 'opacity-70' : ''}" 
+                        style="border-left: 5px solid ${player.id === players[turnIndex].id && isSimulating ? 'var(--neon-yellow)' : 'transparent'};">
+                        
+                        <div class="avatar mr-4">
+                            <img src="${imageUrl}" alt="${player.name}" class="w-12 h-12 object-cover rounded-full border-2 border-[var(--neon-pink)]">
+                        </div>
+
+                        <div class="flex-1">
+                            <h4 class="text-sm font-bold mb-1 text-[var(--neon-pink)]">${player.name} (ID: ${player.id})</h4>
+                            <p class="text-xs text-gray-400 font-mono">${strategy.name}</p>
+                        </div>
+
+                        <div class="ml-4 text-right text-xs font-mono">
+                            <p class="text-white">Cash: <span class="text-[var(--neon-green)]">$${player.cash.toFixed(2)}</span></p>
+                            <p class="text-white">Energy: <span class="${player.energy < 40 ? 'text-[var(--neon-red)]' : 'text-white'}">${player.energy}%</span></p>
+                            <p class="text-white">Location: <span class="text-[var(--neon-cyan)]">${player.location.toUpperCase()}</span></p>
+                            <p class="text-white">Status: <span class="${statusColor}">${statusText}</span></p>
+                            ${progressHtml}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function toggleSimulation() {
+            isSimulating = !isSimulating;
+            
+            if (isSimulating) {
+                if (botIntervalId) clearInterval(botIntervalId);
+                
+                simulateTurn(); 
+                botIntervalId = setInterval(simulateTurn, currentBotSpeed);
+            } else {
+                clearInterval(botIntervalId);
+                botIntervalId = null;
+            }
+            updateUIState();
+        }
+        
+        function resetGame() {
+            if (botIntervalId) clearInterval(botIntervalId);
+            isSimulating = false;
+            botIntervalId = null;
+            
+            createInitialPlayers();
+            gameLogElement.innerHTML = '';
+            logAction("SYSTEM", "Game reset. Ready for new simulation.");
+            updateUIState();
+        }
+
+        function updateUIState() {
+            if (isSimulating) {
+                toggleBotBtn.innerHTML = '<span class="mr-1">⏸️</span> Pause Simulation';
+                toggleBotBtn.style.backgroundColor = 'var(--neon-yellow)';
+                toggleBotBtn.style.boxShadow = '0 0 5px var(--neon-yellow)';
+                currentTurnDisplay.style.backgroundColor = 'rgba(50, 50, 0, 0.6)';
+            } else {
+                toggleBotBtn.innerHTML = '<span class="mr-1">▶️</span> Start Simulation';
+                toggleBotBtn.style.backgroundColor = 'var(--neon-green)';
+                toggleBotBtn.style.boxShadow = '0 0 5px var(--neon-green)';
+                currentTurnDisplay.style.backgroundColor = 'rgba(0, 50, 50, 0.6)';
+            }
+            
+            renderPlayers();
+            updateVisualizer();
+        }
+
+        // --- INITIALIZATION ---
+        window.addEventListener('load', () => {
+            createInitialPlayers();
+            
+            toggleBotBtn.addEventListener('click', toggleSimulation);
+            resetBtn.addEventListener('click', resetGame);
+            generateBotBtn.addEventListener('click', () => generateNewBot(false)); 
+            
+            // Enforce speed limits in JS initialization just in case HTML fails
+            botSpeedRange.min = 500;
+            botSpeedRange.max = 5000;
+            botSpeedRange.step = 500;
+            botSpeedRange.value = 1000;
+
+            botSpeedRange.addEventListener('input', (e) => {
+                currentBotSpeed = parseInt(e.target.value, 10);
+                speedValueDisplay.textContent = currentBotSpeed;
+                
+                if (isSimulating) {
+                    clearInterval(botIntervalId);
+                    botIntervalId = setInterval(simulateTurn, currentBotSpeed);
+                }
+            });
+
+            updateUIState();
+        });
+    </script>
+</body>
+</html>
